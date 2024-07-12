@@ -1,0 +1,129 @@
+# PIPELINE DEFINITION
+# Name: simple-pipeline
+# Description: A simple pipeline that prints a message and adds two numbers
+# Inputs:
+#    a: float [Default: 1.0]
+#    b: float [Default: 7.0]
+components:
+  comp-add-component:
+    executorLabel: exec-add-component
+    inputDefinitions:
+      parameters:
+        a:
+          parameterType: NUMBER_DOUBLE
+        b:
+          parameterType: NUMBER_DOUBLE
+    outputDefinitions:
+      parameters:
+        Output:
+          parameterType: NUMBER_DOUBLE
+  comp-print-component:
+    executorLabel: exec-print-component
+    inputDefinitions:
+      parameters:
+        text:
+          parameterType: STRING
+deploymentSpec:
+  executors:
+    exec-add-component:
+      container:
+        args:
+        - --executor_input
+        - '{{$}}'
+        - --function_to_execute
+        - add_component
+        command:
+        - sh
+        - -c
+        - "\nif ! [ -x \"$(command -v pip)\" ]; then\n    python3 -m ensurepip ||\
+          \ python3 -m ensurepip --user || apt-get install python3-pip\nfi\n\nPIP_DISABLE_PIP_VERSION_CHECK=1\
+          \ python3 -m pip install --quiet --no-warn-script-location 'kfp==2.8.0'\
+          \ '--no-deps' 'typing-extensions>=3.7.4,<5; python_version<\"3.9\"' && \"\
+          $0\" \"$@\"\n"
+        - sh
+        - -ec
+        - 'program_path=$(mktemp -d)
+
+
+          printf "%s" "$0" > "$program_path/ephemeral_component.py"
+
+          _KFP_RUNTIME=true python3 -m kfp.dsl.executor_main                         --component_module_path                         "$program_path/ephemeral_component.py"                         "$@"
+
+          '
+        - "\nimport kfp\nfrom kfp import dsl\nfrom kfp.dsl import *\nfrom typing import\
+          \ *\n\ndef add_component(a: float, b: float) -> float:\n    result = a +\
+          \ b\n    print(f\"{a} + {b} = {result}\")\n    return result\n\n"
+        image: python:3.9
+    exec-print-component:
+      container:
+        args:
+        - --executor_input
+        - '{{$}}'
+        - --function_to_execute
+        - print_component
+        command:
+        - sh
+        - -c
+        - "\nif ! [ -x \"$(command -v pip)\" ]; then\n    python3 -m ensurepip ||\
+          \ python3 -m ensurepip --user || apt-get install python3-pip\nfi\n\nPIP_DISABLE_PIP_VERSION_CHECK=1\
+          \ python3 -m pip install --quiet --no-warn-script-location 'kfp==2.8.0'\
+          \ '--no-deps' 'typing-extensions>=3.7.4,<5; python_version<\"3.9\"' && \"\
+          $0\" \"$@\"\n"
+        - sh
+        - -ec
+        - 'program_path=$(mktemp -d)
+
+
+          printf "%s" "$0" > "$program_path/ephemeral_component.py"
+
+          _KFP_RUNTIME=true python3 -m kfp.dsl.executor_main                         --component_module_path                         "$program_path/ephemeral_component.py"                         "$@"
+
+          '
+        - "\nimport kfp\nfrom kfp import dsl\nfrom kfp.dsl import *\nfrom typing import\
+          \ *\n\ndef print_component(text: str):\n    print(text)\n\n"
+        image: python:3.9
+pipelineInfo:
+  description: A simple pipeline that prints a message and adds two numbers
+  name: simple-pipeline
+root:
+  dag:
+    tasks:
+      add-component:
+        cachingOptions:
+          enableCache: true
+        componentRef:
+          name: comp-add-component
+        inputs:
+          parameters:
+            a:
+              componentInputParameter: a
+            b:
+              componentInputParameter: b
+        taskInfo:
+          name: add-component
+      print-component:
+        cachingOptions:
+          enableCache: true
+        componentRef:
+          name: comp-print-component
+        dependentTasks:
+        - add-component
+        inputs:
+          parameters:
+            text:
+              runtimeValue:
+                constant: Welcome to Kubeflow Pipelines!
+        taskInfo:
+          name: print-component
+  inputDefinitions:
+    parameters:
+      a:
+        defaultValue: 1.0
+        isOptional: true
+        parameterType: NUMBER_DOUBLE
+      b:
+        defaultValue: 7.0
+        isOptional: true
+        parameterType: NUMBER_DOUBLE
+schemaVersion: 2.1.0
+sdkVersion: kfp-2.8.0
